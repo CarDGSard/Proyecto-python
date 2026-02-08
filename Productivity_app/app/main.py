@@ -40,7 +40,10 @@ def create_database():
             title TEXT NOT NULL,
             estimated_minutes INTEGER,
             status TEXT NOT NULL DEFAULT 'pending',
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            real_minutes INTEGER
         )
     """)
 
@@ -59,9 +62,81 @@ def create_task(title, estimated_minutes=None):
 
     conexion.commit()
     conexion.close()
+    
+def get_tasks():
+    conexion = sqlite3.connect( DB_PATH)
+    cursor  = conexion.cursor()
+    
+    cursor.execute('''
+            SELECT id, title, estimated_minutes, status, created_at
+            FROM tasks
+            ''')
+    
+    tareas = cursor.fetchall()
+    
+    conexion.commit()
+    conexion.close()
+    return tareas
 
+def start_task(task_id):
+    conexion = sqlite3.connect( DB_PATH)
+    cursor = conexion.cursor()
+    
+    cursor.execute('''
+                    UPDATE tasks
+                    SET status = 'in_progress',
+                        started_at = datetime('now')
+                    WHERE id = ?
+                   
+                   ''',(task_id,))
+    
+    conexion.commit()
+    conexion.close()
+    
+def finish_task(task_id):
+    conexion = sqlite3.connect( DB_PATH)
+    cursor = conexion.cursor()
+    
+    cursor.execute('''
+           SELECT status FROM tasks WHERE id = ?    
+    ''',(task_id,))
+    
+    result = cursor.fetchone()# Verificar que la tarea existe y está en progreso
+    
+    if not result:
+        print(" La terea no existe.")
+        conexion.close()
+        return
+    
+    if result[0] != "in_progress":
+        print("la tera no esta en progreso.")
+        conexion.close()
+        return
+    
+    cursor.execute("""
+        UPDATE tasks
+        SET status = 'done',
+            finished_at = datetime('now'),
+            real_minutes = (
+                (strftime('%s', datetime('now')) - strftime('%s', started_at)) / 60
+            )
+        WHERE id = ?
+    """, (task_id,))
+    
+    conexion.commit()
+    conexion.close()
+    print("Tarea finalizada correctamente.")
 
 if __name__ == "__main__":
     create_database()
     create_task("Estudiar python", 60)
-    print("Tarea creada exitosamente.")
+    
+    start_task(1)
+    input("Presiona Enter para finalizar la tarea...")
+    
+    finish_task(1)
+
+    for task in get_tasks():
+        print(task)
+        
+
